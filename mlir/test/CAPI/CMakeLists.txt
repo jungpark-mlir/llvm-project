@@ -85,3 +85,13 @@ _add_capi_test_executable(mlir-capi-transform-test
     MLIRCAPIRegisterEverything
     MLIRCAPITransformDialect
 )
+
+_add_capi_test_executable(mlir-capi-target-test
+  target.c
+  LINK_LIBS PRIVATE
+    MLIRCAPIIR
+    MLIRCAPIRegisterEverything
+    MLIRCAPITarget
+    MLIRCAPISPIRV
+)
+
