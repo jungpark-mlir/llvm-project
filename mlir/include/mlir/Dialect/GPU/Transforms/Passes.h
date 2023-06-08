@@ -61,6 +61,11 @@ inline void populateGpuRewritePatterns(RewritePatternSet &patterns) {
   populateGpuAllReducePatterns(patterns);
 }
 
+/// Create serialized binary and attach to the gpu module.
+std::unique_ptr<OperationPass<ModuleOp>>
+createGpuSerializeSPIRVPass(bool emitSymbolName = true,
+                            bool emitDebugInfo = false);
+
 namespace gpu {
 /// Base pass class to serialize kernel functions through LLVM into
 /// user-specified IR and add the resulting blob as module attribute.

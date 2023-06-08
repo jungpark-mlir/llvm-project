@@ -39,6 +39,6 @@ MLIR_CAPI_EXPORTED bool mlirTargetSpirvSerializedBinCreate(MlirModule module,
   std::memcpy(binaryShader, reinterpret_cast<char *>(binary.data()),
               binary.size());
   bin->data = binaryShader;
-  bin->length = binary.size();
+  bin->length = binary.size()*sizeof(int32_t);
   return true;
 }

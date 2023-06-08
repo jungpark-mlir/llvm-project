@@ -37,4 +37,10 @@ def GpuMapParallelLoopsPass
   let dependentDialects = ["mlir::gpu::GPUDialect"];
 }
 
+def GpuSerializeSPIRV : Pass<"gpu-serialize-spirv", "ModuleOp"> {
+  let summary = "Serialize the given kernel functions";
+  let constructor = "mlir::createGpuSerializeSPIRVPass()";
+  let dependentDialects = ["mlir::spirv::SPIRVDialect"];
+}
+
 #endif // MLIR_DIALECT_GPU_PASSES
