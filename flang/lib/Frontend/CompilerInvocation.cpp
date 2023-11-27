@@ -153,6 +153,34 @@ static bool parseDebugArgs(Fortran::frontend::CodeGenOptions &opts,
   return true;
 }
 
+static bool parseVectorLibArg(Fortran::frontend::CodeGenOptions &opts,
+                              llvm::opt::ArgList &args,
+                              clang::DiagnosticsEngine &diags) {
+  llvm::opt::Arg *arg = args.getLastArg(clang::driver::options::OPT_fveclib);
+  if (!arg)
+    return true;
+
+  using VectorLibrary = llvm::driver::VectorLibrary;
+  std::optional<VectorLibrary> val =
+      llvm::StringSwitch<std::optional<VectorLibrary>>(arg->getValue())
+          .Case("Accelerate", VectorLibrary::Accelerate)
+          .Case("LIBMVEC", VectorLibrary::LIBMVEC)
+          .Case("MASSV", VectorLibrary::MASSV)
+          .Case("SVML", VectorLibrary::SVML)
+          .Case("SLEEF", VectorLibrary::SLEEF)
+          .Case("Darwin_libsystem_m", VectorLibrary::Darwin_libsystem_m)
+          .Case("ArmPL", VectorLibrary::ArmPL)
+          .Case("NoLibrary", VectorLibrary::NoLibrary)
+          .Default(std::nullopt);
+  if (!val.has_value()) {
+    diags.Report(clang::diag::err_drv_invalid_value)
+        << arg->getAsString(args) << arg->getValue();
+    return false;
+  }
+  opts.setVecLib(val.value());
+  return true;
+}
+
 // Generate an OptRemark object containing info on if the -Rgroup
 // specified is enabled or not.
 static CodeGenOptions::OptRemark
@@ -1026,6 +1054,27 @@ static bool parseVScaleArgs(CompilerInvocation &invoc, llvm::opt::ArgList &args,
   return true;
 }
 
+static bool parseLinkerOptionsArgs(CompilerInvocation &invoc,
+                                   llvm::opt::ArgList &args,
+                                   clang::DiagnosticsEngine &diags) {
+  llvm::Triple triple = llvm::Triple(invoc.getTargetOpts().triple);
+
+  // TODO: support --dependent-lib on other platforms when MLIR supports
+  //       !llvm.dependent.lib
+  if (args.hasArg(clang::driver::options::OPT_dependent_lib) &&
+      !triple.isOSWindows()) {
+    const unsigned diagID =
+        diags.getCustomDiagID(clang::DiagnosticsEngine::Error,
+                              "--dependent-lib is only supported on Windows");
+    diags.Report(diagID);
+    return false;
+  }
+
+  invoc.getCodeGenOpts().DependentLibs =
+      args.getAllArgValues(clang::driver::options::OPT_dependent_lib);
+  return true;
+}
+
 bool CompilerInvocation::createFromArgs(
     CompilerInvocation &res, llvm::ArrayRef<const char *> commandLineArgs,
     clang::DiagnosticsEngine &diags, const char *argv0) {
@@ -1116,6 +1165,7 @@ bool CompilerInvocation::createFromArgs(
   parsePreprocessorArgs(res.getPreprocessorOpts(), args);
   parseCodeGenArgs(res.getCodeGenOpts(), args, diags);
   success &= parseDebugArgs(res.getCodeGenOpts(), args, diags);
+  success &= parseVectorLibArg(res.getCodeGenOpts(), args, diags);
   success &= parseSemaArgs(res, args, diags);
   success &= parseDialectArgs(res, args, diags);
   success &= parseDiagArgs(res, args, diags);
@@ -1133,6 +1183,8 @@ bool CompilerInvocation::createFromArgs(
   success &= parseFloatingPointArgs(res, args, diags);
 
   success &= parseVScaleArgs(res, args, diags);
+
+  success &= parseLinkerOptionsArgs(res, args, diags);
 
   // Set the string to be used as the return value of the COMPILER_OPTIONS
   // intrinsic of iso_fortran_env. This is either passed in from the parent
