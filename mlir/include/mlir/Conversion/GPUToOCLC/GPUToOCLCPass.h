@@ -7,8 +7,6 @@
 //===----------------------------------------------------------------------===//
 #ifndef MLIR_CONVERSION_GPUTOOCLC_GPUTOOCLCPASS_H_
 #define MLIR_CONVERSION_GPUTOOCLC_GPUTOOCLCPASS_H_
-
-//#include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include <memory>
 

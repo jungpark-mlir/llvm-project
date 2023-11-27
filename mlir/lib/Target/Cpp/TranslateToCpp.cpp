@@ -447,9 +447,9 @@ static LogicalResult printOperation(CppEmitter &emitter,
   return success();
 }
 
-static LogicalResult printOperation(CppEmitter &emitter, func::CallOp callOp) { 
+static LogicalResult printOperation(CppEmitter &emitter, func::CallOp callOp) {
   // No assignment for the void call.
-  if (dyn_cast<NoneType>(callOp->getResultTypes()[0]) == nullptr){
+  if (dyn_cast<NoneType>(callOp->getResultTypes()[0]) == nullptr) {
     if (failed(emitter.emitAssignPrefix(*callOp.getOperation())))
       return failure();
   }
@@ -668,33 +668,32 @@ static LogicalResult printOperation(CppEmitter &emitter,
   if (failed(emitter.emitTypes(functionOp.getLoc(),
                                functionOp.getFunctionType().getResults())))
     return failure();
-  
+
   // Declare as kernel if needed.
   if (functionOp->getAttr("gpu.kernel")) {
     os << " kernel";
   }
   os << " " << functionOp.getName();
 
-
   if (functionOp.getBlocks().size() < 1) {
     os << "(";
     int argIndex = 0;
-/*    for (Type argTy : functionOp.getFunctionType().getInputs()){
-	    emitter.emitType(functionOp.getLoc(), argTy);
-            os << " arg" << argIndex++;
-	    if (argIndex < functionOp->getNumOperands())
-		    os << ", ";
-	}
-		    */
-  if (failed(interleaveCommaWithError(
-          functionOp.getFunctionType().getInputs(), os,
-          [&](Type argTy) -> LogicalResult {
-            if (failed(emitter.emitType(functionOp.getLoc(), argTy)))
-              return failure();
-            os << " arg" << argIndex++;
-            return success();
-          })))
-    return failure();
+    /*    for (Type argTy : functionOp.getFunctionType().getInputs()){
+                emitter.emitType(functionOp.getLoc(), argTy);
+                os << " arg" << argIndex++;
+                if (argIndex < functionOp->getNumOperands())
+                        os << ", ";
+            }
+                        */
+    if (failed(interleaveCommaWithError(
+            functionOp.getFunctionType().getInputs(), os,
+            [&](Type argTy) -> LogicalResult {
+              if (failed(emitter.emitType(functionOp.getLoc(), argTy)))
+                return failure();
+              os << " arg" << argIndex++;
+              return success();
+            })))
+      return failure();
 
     os << ");";
     return success();

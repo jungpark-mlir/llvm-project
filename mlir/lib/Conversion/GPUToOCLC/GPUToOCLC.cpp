@@ -14,13 +14,11 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinDialect.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/RegionUtils.h"
-
-
 
 namespace mlir {
 #define GEN_PASS_DEF_CONVERTGPUOPSTOOCLCOPS
@@ -33,12 +31,12 @@ namespace {
 
 static std::string getDim(gpu::Dimension dim) {
   switch (dim) {
-    case gpu::Dimension::x:
-      return "0";
-    case gpu::Dimension::y:
-      return "1";
-    case gpu::Dimension::z:
-      return "2";
+  case gpu::Dimension::x:
+    return "0";
+  case gpu::Dimension::y:
+    return "1";
+  case gpu::Dimension::z:
+    return "2";
   }
   llvm_unreachable("All dimension enum cases handled above");
 }
@@ -84,22 +82,11 @@ GPUOpToOCLCCall<Op>::matchAndRewrite(Op op, PatternRewriter &rewriter) const {
   std::string name = libFunc;
   auto opFunc = dyn_cast_or_null<SymbolOpInterface>(
       SymbolTable::lookupSymbolIn(module, name));
-  /*
-  auto resultTypes = op->getResultTypes();
-  SmallVector<Type> retTypes;
-  for (Type resultType : resultTypes) {
-    retTypes.push_back(resultType);
-  }
-*/
+
   if (isa<gpu::SubgroupMmaLoadMatrixOp>(op)) {
     // Only AOp type for the loads needed. Otherwise, it shall be passed via
     // function args and will be embedded into the constructed opaque struct
-    /*
-    gpu::MMAMatrixType mmaType = cast<gpu::MMAMatrixType>(retTypes[0]);
-    gpu::MMAMatrixType typeAOp = gpu::MMAMatrixType::get(
-        mmaType.getShape(), mmaType.getElementType(), "AOp");
-    retTypes[0] = typeAOp;
-    */
+
     gpu::MMAMatrixType mmaType = cast<gpu::MMAMatrixType>(op.getType());
     name.append(mmaType.getOperand());
   }
@@ -145,7 +132,6 @@ GPUOpToVoidOCLCCall<Op>::matchAndRewrite(Op op,
     rewriter.setInsertionPointToStart(&module->getRegion(0).front());
     FunctionType opFunctionTy = FunctionType::get(
         rewriter.getContext(), op->getOperandTypes(), rewriter.getNoneType());
-    // rewriter.getContext(), op->getOperandTypes(), op->getResultTypes());
     opFunc = rewriter.create<func::FuncOp>(rewriter.getUnknownLoc(), name,
                                            opFunctionTy);
     opFunc.setPrivate();
@@ -179,19 +165,19 @@ public:
   LogicalResult
   matchAndRewrite(gpu::GPUFuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-auto name = op.getName();
+    auto name = op.getName();
 
-FunctionType opFunctionTy = op.getFunctionType();
-func::FuncOp opFunc = rewriter.create<func::FuncOp>(op->getLoc(), name,
-                                           opFunctionTy);
-opFunc->setAttr("gpu.kernel", rewriter.getUnitAttr());
-Region &gpuFuncOpBody = op.getBody();
+    FunctionType opFunctionTy = op.getFunctionType();
+    func::FuncOp opFunc =
+        rewriter.create<func::FuncOp>(op->getLoc(), name, opFunctionTy);
+    opFunc->setAttr("gpu.kernel", rewriter.getUnitAttr());
+    Region &gpuFuncOpBody = op.getBody();
 
-IRMapping map;
+    IRMapping map;
 
-Region &opFuncBody = opFunc.getBody();
-opFuncBody.takeBody(gpuFuncOpBody);
-      
+    Region &opFuncBody = opFunc.getBody();
+    opFuncBody.takeBody(gpuFuncOpBody);
+
     rewriter.eraseOp(op);
 
     return success();
@@ -229,8 +215,10 @@ void ConvertGpuOpsToOCLCOpsPass::runOnOperation() {
   ConversionTarget target(getContext());
   target.addLegalDialect<arith::ArithDialect, BuiltinDialect, func::FuncDialect,
                          gpu::GPUDialect>();
-  target.addIllegalOp<gpu::BlockIdOp, gpu::SubgroupMmaComputeOp, gpu::SubgroupMmaLoadMatrixOp,
-                      gpu::SubgroupMmaStoreMatrixOp, gpu::GPUFuncOp, gpu::LaunchFuncOp,  gpu::ReturnOp>();
+  target
+      .addIllegalOp<gpu::BlockIdOp, gpu::SubgroupMmaComputeOp,
+                    gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp,
+                    gpu::GPUFuncOp, gpu::LaunchFuncOp, gpu::ReturnOp>();
   if (failed(applyPartialConversion(module, target, std::move(patterns))))
     signalPassFailure();
 }
