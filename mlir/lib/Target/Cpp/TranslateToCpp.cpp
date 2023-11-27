@@ -10,6 +10,8 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -302,6 +304,51 @@ static LogicalResult printOperation(CppEmitter &emitter, emitc::SubOp subOp) {
   return printBinaryOperation(emitter, operation, "-");
 }
 
+static LogicalResult printOperation(CppEmitter &emitter, arith::AddIOp addiOp) {
+  Operation *operation = addiOp.getOperation();
+
+  return printBinaryOperation(emitter, operation, "+");
+}
+
+static LogicalResult printOperation(CppEmitter &emitter, arith::MulIOp muliOp) {
+  Operation *operation = muliOp.getOperation();
+
+  return printBinaryOperation(emitter, operation, "*");
+}
+
+static LogicalResult printOperation(CppEmitter &emitter, arith::CmpIOp cmpOp) {
+  Operation *operation = cmpOp.getOperation();
+
+  StringRef binaryOperator;
+
+  switch (cmpOp.getPredicate()) {
+  case arith::CmpIPredicate::eq:
+    binaryOperator = "==";
+    break;
+  case arith::CmpIPredicate::ne:
+    binaryOperator = "!=";
+    break;
+  case arith::CmpIPredicate::slt:
+  case arith::CmpIPredicate::ult:
+    binaryOperator = "<";
+    break;
+  case arith::CmpIPredicate::sle:
+  case arith::CmpIPredicate::ule:
+    binaryOperator = "<=";
+    break;
+  case arith::CmpIPredicate::sgt:
+  case arith::CmpIPredicate::ugt:
+    binaryOperator = ">";
+    break;
+  case arith::CmpIPredicate::sge:
+  case arith::CmpIPredicate::uge:
+    binaryOperator = ">=";
+    break;
+  }
+
+  return printBinaryOperation(emitter, operation, binaryOperator);
+}
+
 static LogicalResult printOperation(CppEmitter &emitter, emitc::CmpOp cmpOp) {
   Operation *operation = cmpOp.getOperation();
 
@@ -400,9 +447,12 @@ static LogicalResult printOperation(CppEmitter &emitter,
   return success();
 }
 
-static LogicalResult printOperation(CppEmitter &emitter, func::CallOp callOp) {
-  if (failed(emitter.emitAssignPrefix(*callOp.getOperation())))
-    return failure();
+static LogicalResult printOperation(CppEmitter &emitter, func::CallOp callOp) { 
+  // No assignment for the void call.
+  if (dyn_cast<NoneType>(callOp->getResultTypes()[0]) == nullptr){
+    if (failed(emitter.emitAssignPrefix(*callOp.getOperation())))
+      return failure();
+  }
 
   raw_ostream &os = emitter.ostream();
   os << callOp.getCallee() << "(";
@@ -618,7 +668,37 @@ static LogicalResult printOperation(CppEmitter &emitter,
   if (failed(emitter.emitTypes(functionOp.getLoc(),
                                functionOp.getFunctionType().getResults())))
     return failure();
+  
+  // Declare as kernel if needed.
+  if (functionOp->getAttr("gpu.kernel")) {
+    os << " kernel";
+  }
   os << " " << functionOp.getName();
+
+
+  if (functionOp.getBlocks().size() < 1) {
+    os << "(";
+    int argIndex = 0;
+/*    for (Type argTy : functionOp.getFunctionType().getInputs()){
+	    emitter.emitType(functionOp.getLoc(), argTy);
+            os << " arg" << argIndex++;
+	    if (argIndex < functionOp->getNumOperands())
+		    os << ", ";
+	}
+		    */
+  if (failed(interleaveCommaWithError(
+          functionOp.getFunctionType().getInputs(), os,
+          [&](Type argTy) -> LogicalResult {
+            if (failed(emitter.emitType(functionOp.getLoc(), argTy)))
+              return failure();
+            os << " arg" << argIndex++;
+            return success();
+          })))
+    return failure();
+
+    os << ");";
+    return success();
+  }
 
   os << "(";
   if (failed(interleaveCommaWithError(
@@ -954,7 +1034,7 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
           .Case<func::CallOp, func::ConstantOp, func::FuncOp, func::ReturnOp>(
               [&](auto op) { return printOperation(*this, op); })
           // Arithmetic ops.
-          .Case<arith::ConstantOp>(
+          .Case<arith::AddIOp, arith::ConstantOp, arith::MulIOp, arith::CmpIOp>(
               [&](auto op) { return printOperation(*this, op); })
           .Case<emitc::LiteralOp>([&](auto op) { return success(); })
           .Default([&](Operation *) {
@@ -1016,6 +1096,27 @@ LogicalResult CppEmitter::emitType(Location loc, Type type) {
     os << ">";
     return success();
   }
+  if (auto tType = dyn_cast<MemRefType>(type)) {
+    if (!tType.hasRank())
+      return emitError(loc, "cannot emit unranked memref type??");
+    if (!tType.hasStaticShape())
+      return emitError(loc, "cannot emit memref type with non static shape??");
+    os << "MemRef_";
+    if (failed(emitType(loc, tType.getElementType())))
+      return failure();
+    return success();
+  }
+  if (auto tType = dyn_cast<NoneType>(type)) {
+    os << "void";
+    return success();
+  }
+  if (auto tType = dyn_cast<gpu::MMAMatrixType>(type)) {
+    os << "CoopMat_";
+    if (failed(emitType(loc, tType.getElementType())))
+      return failure();
+    return success();
+  }
+
   if (auto tType = dyn_cast<TupleType>(type))
     return emitTupleType(loc, tType.getTypes());
   if (auto oType = dyn_cast<emitc::OpaqueType>(type)) {

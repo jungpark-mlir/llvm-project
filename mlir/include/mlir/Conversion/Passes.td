@@ -504,6 +504,26 @@ def ConvertGpuOpsToNVVMOps : Pass<"convert-gpu-to-nvvm", "gpu::GPUModuleOp"> {
 }
 
 //===----------------------------------------------------------------------===//
+// GPUToOCLC
+//===----------------------------------------------------------------------===//
+
+def ConvertGpuOpsToOCLCOps : Pass<"convert-gpu-to-oclc", "gpu::GPUModuleOp"> {
+  let summary = "Generate OCLC target Func Ops for gpu operations";
+  let description = [{
+    This pass converts supported GPU device ops to Func ops. It does not
+    handle GPU host ops.
+    Assuming the funcion body implementation is given by either linking
+    library later or builtins in further compiler toolchain.
+  }];
+  let constructor = "mlir::createGpuOpsToOCLCOpsPass()";
+  let dependentDialects = [
+    "func::FuncDialect",
+    "memref::MemRefDialect",
+    "emitc::EmitCDialect"
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // GPUToROCDL
 //===----------------------------------------------------------------------===//
 
