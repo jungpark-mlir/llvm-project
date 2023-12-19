@@ -28,17 +28,19 @@ add_llvm_unittest(CodeGenTests
   InstrRefLDVTest.cpp
   LowLevelTypeTest.cpp
   LexicalScopesTest.cpp
+  MachineBasicBlockTest.cpp
   MachineInstrBundleIteratorTest.cpp
   MachineInstrTest.cpp
   MachineOperandTest.cpp
   RegAllocScoreTest.cpp
   PassManagerTest.cpp
   ScalableVectorMVTsTest.cpp
+  SchedBoundary.cpp
   SelectionDAGAddressAnalysisTest.cpp
   TypeTraitsTest.cpp
   TargetOptionsTest.cpp
   TestAsmPrinter.cpp
-  MLRegallocDevelopmentFeatures.cpp
+  MLRegAllocDevelopmentFeatures.cpp
   )
 
 add_subdirectory(GlobalISel)

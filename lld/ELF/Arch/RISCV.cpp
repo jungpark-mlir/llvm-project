@@ -306,6 +306,8 @@ RelExpr RISCV::getRelExpr(const RelType type, const Symbol &s,
   case R_RISCV_TPREL_ADD:
   case R_RISCV_RELAX:
     return config->relax ? R_RELAX_HINT : R_NONE;
+  case R_RISCV_SET_ULEB128:
+    return R_RISCV_LEB128;
   default:
     error(getErrorLocation(loc) + "unknown relocation (" + Twine(type) +
           ") against symbol " + toString(s));
@@ -550,10 +552,18 @@ static void initSymbolAnchors() {
   }
   // Store anchors (st_value and st_value+st_size) for symbols relative to text
   // sections.
+  //
+  // For a defined symbol foo, we may have `d->file != file` with --wrap=foo.
+  // We should process foo, as the defining object file's symbol table may not
+  // contain foo after redirectSymbols changed the foo entry to __wrap_foo. To
+  // avoid adding a Defined that is undefined in one object file, use
+  // `!d->scriptDefined` to exclude symbols that are definitely not wrapped.
+  //
+  // `relaxAux->anchors` may contain duplicate symbols, but that is fine.
   for (InputFile *file : ctx.objectFiles)
     for (Symbol *sym : file->getSymbols()) {
       auto *d = dyn_cast<Defined>(sym);
-      if (!d || d->file != file)
+      if (!d || (d->file != file && !d->scriptDefined))
         continue;
       if (auto *sec = dyn_cast_or_null<InputSection>(d->section))
         if (sec->flags & SHF_EXECINSTR && sec->relaxAux) {
@@ -581,7 +591,7 @@ static void initSymbolAnchors() {
 // Relax R_RISCV_CALL/R_RISCV_CALL_PLT auipc+jalr to c.j, c.jal, or jal.
 static void relaxCall(const InputSection &sec, size_t i, uint64_t loc,
                       Relocation &r, uint32_t &remove) {
-  const bool rvc = config->eflags & EF_RISCV_RVC;
+  const bool rvc = getEFlags(sec.file) & EF_RISCV_RVC;
   const Symbol &sym = *r.sym;
   const uint64_t insnPair = read64le(sec.content().data() + r.offset);
   const uint32_t rd = extractBits(insnPair, 32 + 11, 32 + 7);
@@ -925,7 +935,7 @@ mergeAttributesSection(const SmallVector<InputSectionBase *, 0> &sections) {
   const auto &attributesTags = RISCVAttrs::getRISCVAttributeTags();
   for (const InputSectionBase *sec : sections) {
     RISCVAttributeParser parser;
-    if (Error e = parser.parse(sec->content(), support::little))
+    if (Error e = parser.parse(sec->content(), llvm::endianness::little))
       warn(toString(sec) + ": " + llvm::toString(std::move(e)));
     for (const auto &tag : attributesTags) {
       switch (RISCVAttrs::AttrType(tag.attr)) {

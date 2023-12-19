@@ -14,7 +14,9 @@
 // XFAIL: libcpp-no-vcruntime
 // XFAIL: LIBCXX-AIX-FIXME
 
-// TODO: Investigate why this fails on Windows
+// MSVC/vcruntime falls back from the nothrow array new to the nothrow
+// scalar new, instead of falling back on the throwing array new.
+// https://developercommunity.visualstudio.com/t/vcruntime-nothrow-array-operator-new-fal/10373274
 // XFAIL: target={{.+}}-windows-msvc
 
 #include <new>
@@ -31,7 +33,9 @@ TEST_WORKAROUND_BUG_109234844_WEAK
 void* operator new[](std::size_t s) TEST_THROW_SPEC(std::bad_alloc) {
     ++new_called;
     void* ret = std::malloc(s);
-    if (!ret) std::abort(); // placate MSVC's unchecked malloc warning
+    if (!ret) {
+      std::abort(); // placate MSVC's unchecked malloc warning (assert() won't silence it)
+    }
     return ret;
 }
 

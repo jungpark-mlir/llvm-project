@@ -142,7 +142,8 @@ public:
 
   /// Attaches module-level metadata for functions marked as kernels.
   LogicalResult
-  amendOperation(Operation *op, NamedAttribute attribute,
+  amendOperation(Operation *op, ArrayRef<llvm::Instruction *> instructions,
+                 NamedAttribute attribute,
                  LLVM::ModuleTranslation &moduleTranslation) const final {
     auto func = dyn_cast<LLVM::LLVMFuncOp>(op);
     if (!func)
@@ -165,7 +166,7 @@ public:
       if (!dyn_cast<ArrayAttr>(attribute.getValue()))
         return failure();
       SmallVector<int64_t> values =
-          extractFromI64ArrayAttr(attribute.getValue());
+          extractFromIntegerArrayAttr<int64_t>(attribute.getValue());
       generateMetadata(values[0], NVVM::NVVMDialect::getMaxntidXName());
       if (values.size() > 1)
         generateMetadata(values[1], NVVM::NVVMDialect::getMaxntidYName());
@@ -175,7 +176,7 @@ public:
       if (!dyn_cast<ArrayAttr>(attribute.getValue()))
         return failure();
       SmallVector<int64_t> values =
-          extractFromI64ArrayAttr(attribute.getValue());
+          extractFromIntegerArrayAttr<int64_t>(attribute.getValue());
       generateMetadata(values[0], NVVM::NVVMDialect::getReqntidXName());
       if (values.size() > 1)
         generateMetadata(values[1], NVVM::NVVMDialect::getReqntidYName());

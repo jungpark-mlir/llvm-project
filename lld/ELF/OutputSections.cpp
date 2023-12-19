@@ -22,6 +22,8 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TimeProfiler.h"
 #if LLVM_ENABLE_ZLIB
+// Avoid introducing max as a macro from Windows headers.
+#define NOMINMAX
 #include <zlib.h>
 #endif
 #if LLVM_ENABLE_ZSTD
@@ -331,7 +333,7 @@ template <class ELFT> void OutputSection::maybeCompress() {
 
   // Compress only DWARF debug sections.
   if (config->compressDebugSections == DebugCompressionType::None ||
-      (flags & SHF_ALLOC) || !name.startswith(".debug_") || size == 0)
+      (flags & SHF_ALLOC) || !name.starts_with(".debug_") || size == 0)
     return;
 
   llvm::TimeTraceScope timeScope("Compress debug sections");
@@ -495,6 +497,12 @@ void OutputSection::writeTo(uint8_t *buf, parallel::TaskGroup &tg) {
         s->writeTo(buf + isec->outSecOff);
       else
         isec->writeTo<ELFT>(buf + isec->outSecOff);
+
+      // When in Arm BE8 mode, the linker has to convert the big-endian
+      // instructions to little-endian, leaving the data big-endian.
+      if (config->emachine == EM_ARM && !config->isLE && config->armBe8 &&
+          (flags & SHF_EXECINSTR))
+        convertArmInstructionstoBE8(isec, buf + isec->outSecOff);
 
       // Fill gaps between sections.
       if (nonZeroFiller) {
@@ -669,7 +677,7 @@ int elf::getPriority(StringRef s) {
     return 65536;
   int v = 65536;
   if (to_integer(s.substr(pos + 1), v, 10) &&
-      (pos == 6 && (s.startswith(".ctors") || s.startswith(".dtors"))))
+      (pos == 6 && (s.starts_with(".ctors") || s.starts_with(".dtors"))))
     v = 65535 - v;
   return v;
 }
@@ -738,6 +746,12 @@ void OutputSection::checkDynRelAddends(const uint8_t *bufStart) {
       int64_t addend = rel.addend;
       const OutputSection *relOsec = rel.inputSec->getOutputSection();
       assert(relOsec != nullptr && "missing output section for relocation");
+      // Some targets have NOBITS synthetic sections with dynamic relocations
+      // with non-zero addends. Skip such sections.
+      if (is_contained({EM_PPC, EM_PPC64}, config->emachine) &&
+          (rel.inputSec == in.ppc64LongBranchTarget.get() ||
+           rel.inputSec == in.igotPlt.get()))
+        continue;
       const uint8_t *relocTarget =
           bufStart + relOsec->offset + rel.inputSec->getOffset(rel.offsetInSec);
       // For SHT_NOBITS the written addend is always zero.

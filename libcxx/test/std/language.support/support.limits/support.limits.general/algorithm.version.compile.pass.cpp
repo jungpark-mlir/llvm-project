@@ -18,8 +18,9 @@
 /*  Constant                                 Value
     __cpp_lib_clamp                          201603L [C++17]
     __cpp_lib_constexpr_algorithms           201806L [C++20]
+    __cpp_lib_freestanding_algorithm         202311L [C++26]
     __cpp_lib_parallel_algorithm             201603L [C++17]
-    __cpp_lib_ranges                         202106L [C++20]
+    __cpp_lib_ranges                         202207L [C++20]
     __cpp_lib_ranges_starts_ends_with        202106L [C++23]
     __cpp_lib_robust_nonmodifying_seq_ops    201304L [C++14]
     __cpp_lib_sample                         201603L [C++17]
@@ -37,6 +38,10 @@
 
 # ifdef __cpp_lib_constexpr_algorithms
 #   error "__cpp_lib_constexpr_algorithms should not be defined before c++20"
+# endif
+
+# ifdef __cpp_lib_freestanding_algorithm
+#   error "__cpp_lib_freestanding_algorithm should not be defined before c++26"
 # endif
 
 # ifdef __cpp_lib_parallel_algorithm
@@ -71,6 +76,10 @@
 
 # ifdef __cpp_lib_constexpr_algorithms
 #   error "__cpp_lib_constexpr_algorithms should not be defined before c++20"
+# endif
+
+# ifdef __cpp_lib_freestanding_algorithm
+#   error "__cpp_lib_freestanding_algorithm should not be defined before c++26"
 # endif
 
 # ifdef __cpp_lib_parallel_algorithm
@@ -111,6 +120,10 @@
 
 # ifdef __cpp_lib_constexpr_algorithms
 #   error "__cpp_lib_constexpr_algorithms should not be defined before c++20"
+# endif
+
+# ifdef __cpp_lib_freestanding_algorithm
+#   error "__cpp_lib_freestanding_algorithm should not be defined before c++26"
 # endif
 
 # if !defined(_LIBCPP_VERSION)
@@ -168,6 +181,10 @@
 #   error "__cpp_lib_constexpr_algorithms should have the value 201806L in c++20"
 # endif
 
+# ifdef __cpp_lib_freestanding_algorithm
+#   error "__cpp_lib_freestanding_algorithm should not be defined before c++26"
+# endif
+
 # if !defined(_LIBCPP_VERSION)
 #   ifndef __cpp_lib_parallel_algorithm
 #     error "__cpp_lib_parallel_algorithm should be defined in c++20"
@@ -184,8 +201,8 @@
 # ifndef __cpp_lib_ranges
 #   error "__cpp_lib_ranges should be defined in c++20"
 # endif
-# if __cpp_lib_ranges != 202106L
-#   error "__cpp_lib_ranges should have the value 202106L in c++20"
+# if __cpp_lib_ranges != 202207L
+#   error "__cpp_lib_ranges should have the value 202207L in c++20"
 # endif
 
 # ifdef __cpp_lib_ranges_starts_ends_with
@@ -229,6 +246,10 @@
 #   error "__cpp_lib_constexpr_algorithms should have the value 201806L in c++23"
 # endif
 
+# ifdef __cpp_lib_freestanding_algorithm
+#   error "__cpp_lib_freestanding_algorithm should not be defined before c++26"
+# endif
+
 # if !defined(_LIBCPP_VERSION)
 #   ifndef __cpp_lib_parallel_algorithm
 #     error "__cpp_lib_parallel_algorithm should be defined in c++23"
@@ -245,8 +266,8 @@
 # ifndef __cpp_lib_ranges
 #   error "__cpp_lib_ranges should be defined in c++23"
 # endif
-# if __cpp_lib_ranges != 202106L
-#   error "__cpp_lib_ranges should have the value 202106L in c++23"
+# if __cpp_lib_ranges != 202207L
+#   error "__cpp_lib_ranges should have the value 202207L in c++23"
 # endif
 
 # if !defined(_LIBCPP_VERSION)
@@ -300,6 +321,19 @@
 # endif
 
 # if !defined(_LIBCPP_VERSION)
+#   ifndef __cpp_lib_freestanding_algorithm
+#     error "__cpp_lib_freestanding_algorithm should be defined in c++26"
+#   endif
+#   if __cpp_lib_freestanding_algorithm != 202311L
+#     error "__cpp_lib_freestanding_algorithm should have the value 202311L in c++26"
+#   endif
+# else // _LIBCPP_VERSION
+#   ifdef __cpp_lib_freestanding_algorithm
+#     error "__cpp_lib_freestanding_algorithm should not be defined because it is unimplemented in libc++!"
+#   endif
+# endif
+
+# if !defined(_LIBCPP_VERSION)
 #   ifndef __cpp_lib_parallel_algorithm
 #     error "__cpp_lib_parallel_algorithm should be defined in c++26"
 #   endif
@@ -315,8 +349,8 @@
 # ifndef __cpp_lib_ranges
 #   error "__cpp_lib_ranges should be defined in c++26"
 # endif
-# if __cpp_lib_ranges != 202106L
-#   error "__cpp_lib_ranges should have the value 202106L in c++26"
+# if __cpp_lib_ranges != 202207L
+#   error "__cpp_lib_ranges should have the value 202207L in c++26"
 # endif
 
 # if !defined(_LIBCPP_VERSION)

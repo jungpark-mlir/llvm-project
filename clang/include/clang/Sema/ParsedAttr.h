@@ -24,6 +24,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/VersionTuple.h"
+#include <bitset>
 #include <cassert>
 #include <cstddef>
 #include <cstring>
@@ -273,12 +274,13 @@ private:
   /// Constructor for attributes with a single type argument.
   ParsedAttr(IdentifierInfo *attrName, SourceRange attrRange,
              IdentifierInfo *scopeName, SourceLocation scopeLoc,
-             ParsedType typeArg, Form formUsed)
+             ParsedType typeArg, Form formUsed, SourceLocation ellipsisLoc)
       : AttributeCommonInfo(attrName, scopeName, attrRange, scopeLoc, formUsed),
-        NumArgs(0), Invalid(false), UsedAsTypeAttr(false),
-        IsAvailability(false), IsTypeTagForDatatype(false), IsProperty(false),
-        HasParsedType(true), HasProcessingCache(false),
-        IsPragmaClangAttribute(false), Info(ParsedAttrInfo::get(*this)) {
+        EllipsisLoc(ellipsisLoc), NumArgs(0), Invalid(false),
+        UsedAsTypeAttr(false), IsAvailability(false),
+        IsTypeTagForDatatype(false), IsProperty(false), HasParsedType(true),
+        HasProcessingCache(false), IsPragmaClangAttribute(false),
+        Info(ParsedAttrInfo::get(*this)) {
     new (&getTypeBuffer()) ParsedType(typeArg);
   }
 
@@ -782,13 +784,14 @@ public:
                                   SourceRange attrRange,
                                   IdentifierInfo *scopeName,
                                   SourceLocation scopeLoc, ParsedType typeArg,
-                                  ParsedAttr::Form formUsed) {
+                                  ParsedAttr::Form formUsed,
+                                  SourceLocation ellipsisLoc) {
     void *memory = allocate(
         ParsedAttr::totalSizeToAlloc<ArgsUnion, detail::AvailabilityData,
                                      detail::TypeTagForDatatypeData, ParsedType,
                                      detail::PropertyData>(0, 0, 0, 1, 0));
     return add(new (memory) ParsedAttr(attrName, attrRange, scopeName, scopeLoc,
-                                       typeArg, formUsed));
+                                       typeArg, formUsed, ellipsisLoc));
   }
 
   ParsedAttr *
@@ -909,6 +912,20 @@ private:
   VecTy AttrList;
 };
 
+struct ParsedAttributeArgumentsProperties {
+  ParsedAttributeArgumentsProperties(uint32_t StringLiteralBits)
+      : StringLiterals(StringLiteralBits) {}
+  bool isStringLiteralArg(unsigned I) const {
+    // If the last bit is set, assume we have a variadic parameter
+    if (I >= StringLiterals.size())
+      return StringLiterals.test(StringLiterals.size() - 1);
+    return StringLiterals.test(I);
+  }
+
+private:
+  std::bitset<32> StringLiterals;
+};
+
 /// ParsedAttributes - A collection of parsed attributes.  Currently
 /// we don't differentiate between the various attribute syntaxes,
 /// which is basically silly.
@@ -1001,9 +1018,11 @@ public:
   /// Add an attribute with a single type argument.
   ParsedAttr *addNewTypeAttr(IdentifierInfo *attrName, SourceRange attrRange,
                              IdentifierInfo *scopeName, SourceLocation scopeLoc,
-                             ParsedType typeArg, ParsedAttr::Form formUsed) {
-    ParsedAttr *attr = pool.createTypeAttribute(attrName, attrRange, scopeName,
-                                                scopeLoc, typeArg, formUsed);
+                             ParsedType typeArg, ParsedAttr::Form formUsed,
+                             SourceLocation ellipsisLoc = SourceLocation()) {
+    ParsedAttr *attr =
+        pool.createTypeAttribute(attrName, attrRange, scopeName, scopeLoc,
+                                 typeArg, formUsed, ellipsisLoc);
     addAtEnd(attr);
     return attr;
   }

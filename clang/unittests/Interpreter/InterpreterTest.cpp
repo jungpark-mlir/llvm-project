@@ -46,7 +46,9 @@ createInterpreter(const Args &ExtraArgs = {},
                   DiagnosticConsumer *Client = nullptr) {
   Args ClangArgs = {"-Xclang", "-emit-llvm-only"};
   ClangArgs.insert(ClangArgs.end(), ExtraArgs.begin(), ExtraArgs.end());
-  auto CI = cantFail(clang::IncrementalCompilerBuilder::create(ClangArgs));
+  auto CB = clang::IncrementalCompilerBuilder();
+  CB.SetCompilerArgs(ClangArgs);
+  auto CI = cantFail(CB.CreateCpp());
   if (Client)
     CI->getDiagnostics().setClient(Client, /*ShouldOwnClient=*/false);
   return cantFail(clang::Interpreter::create(std::move(CI)));
@@ -230,10 +232,20 @@ TEST(IncrementalProcessing, FindMangledNameSymbol) {
   }
 
   std::string MangledName = MangleName(FD);
-  auto Addr = cantFail(Interp->getSymbolAddress(MangledName));
-  EXPECT_NE(0U, Addr.getValue());
+  auto Addr = Interp->getSymbolAddress(MangledName);
+  EXPECT_FALSE(!Addr);
+  EXPECT_NE(0U, Addr->getValue());
   GlobalDecl GD(FD);
-  EXPECT_EQ(Addr, cantFail(Interp->getSymbolAddress(GD)));
+  EXPECT_EQ(*Addr, cantFail(Interp->getSymbolAddress(GD)));
+  cantFail(
+      Interp->ParseAndExecute("extern \"C\" int printf(const char*,...);"));
+  Addr = Interp->getSymbolAddress("printf");
+  EXPECT_FALSE(!Addr);
+
+  // FIXME: Re-enable when we investigate the way we handle dllimports on Win.
+#ifndef _WIN32
+  EXPECT_EQ((uintptr_t)&printf, Addr->getValue());
+#endif // _WIN32
 }
 
 static void *AllocateObject(TypeDecl *TD, Interpreter &Interp) {

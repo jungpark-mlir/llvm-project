@@ -1,14 +1,17 @@
 add_custom_target(libc-support-tests)
 
-add_libc_test(
-  blockstore_test
-  SUITE
-    libc-support-tests
-  SRCS
-    blockstore_test.cpp
-  DEPENDS
-    libc.src.__support.blockstore
-)
+# FIXME: These tests are currently broken on the GPU.
+if(NOT LIBC_TARGET_ARCHITECTURE_IS_GPU)
+  add_libc_test(
+    blockstore_test
+    SUITE
+      libc-support-tests
+    SRCS
+      blockstore_test.cpp
+    DEPENDS
+      libc.src.__support.blockstore
+  )
+endif()
 
 add_libc_test(
   endian_test
@@ -20,19 +23,26 @@ add_libc_test(
     libc.src.__support.common
 )
 
-# This test fails with a segmentation fault on NVPTX.
-if(NOT LIBC_GPU_TARGET_ARCHITECTURE_IS_NVPTX)
-  add_libc_test(
-    high_precision_decimal_test
-    SUITE
-      libc-support-tests
-    SRCS
-    high_precision_decimal_test.cpp
-    DEPENDS
-      libc.src.__support.high_precision_decimal
-      libc.src.__support.uint128
-  )
-endif()
+add_libc_test(
+  math_extras_test
+  SUITE
+    libc-support-tests
+  SRCS
+    math_extras_test.cpp
+  DEPENDS
+    libc.src.__support.math_extras
+)
+
+add_libc_test(
+  high_precision_decimal_test
+  SUITE
+    libc-support-tests
+  SRCS
+  high_precision_decimal_test.cpp
+  DEPENDS
+    libc.src.__support.high_precision_decimal
+    libc.src.__support.uint128
+)
 
 add_libc_test(
   str_to_float_test
@@ -40,6 +50,8 @@ add_libc_test(
     libc-support-tests
   SRCS
     str_to_float_test.cpp
+    str_to_double_test.cpp
+    str_to_long_double_test.cpp
   DEPENDS
     libc.src.__support.str_to_float
     libc.src.__support.uint128
@@ -93,8 +105,6 @@ add_libc_test(
     libc.src.__support.fixedvector
 )
 
-# This test fails with a segmentation fault on NVPTX.
-if(NOT LIBC_GPU_TARGET_ARCHITECTURE_IS_NVPTX)
 add_libc_test(
   char_vector_test
   SUITE
@@ -104,7 +114,32 @@ add_libc_test(
   DEPENDS
     libc.src.__support.char_vector
 )
-endif()
+
+add_libc_test(
+  hash_test
+  SUITE
+    libc-support-tests
+  SRCS
+    hash_test.cpp
+  DEPENDS
+    libc.src.__support.hash
+    libc.src.__support.CPP.new
+    libc.src.stdlib.rand
+    libc.src.stdlib.srand
+    libc.src.string.memset
+  UNIT_TEST_ONLY
+    # Aligned Allocation is not supported in hermetic builds.
+)
+
+add_libc_test(
+  memory_size_test
+  SUITE
+    libc-support-tests
+  SRCS
+    memory_size_test.cpp
+  DEPENDS
+    libc.src.__support.memory_size
+)
 
 add_executable(
   libc_str_to_float_comparison_test
@@ -132,5 +167,7 @@ add_custom_command(TARGET libc_str_to_float_comparison_test
 
 add_subdirectory(CPP)
 add_subdirectory(File)
+add_subdirectory(RPC)
 add_subdirectory(OSUtil)
 add_subdirectory(FPUtil)
+add_subdirectory(HashTable)

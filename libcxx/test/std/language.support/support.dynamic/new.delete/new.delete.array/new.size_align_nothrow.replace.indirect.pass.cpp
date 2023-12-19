@@ -16,15 +16,9 @@
 
 // XFAIL: LIBCXX-AIX-FIXME
 
-// We get availability markup errors when aligned allocation is missing
-// XFAIL: availability-aligned_allocation-missing
-
 // Libc++ when built for z/OS doesn't contain the aligned allocation functions,
 // nor does the dynamic library shipped with z/OS.
 // UNSUPPORTED: target={{.+}}-zos{{.*}}
-
-// TODO: Investigate why this fails on MinGW-shared
-// UNSUPPORTED: target={{.+}}-windows-gnu
 
 #include <new>
 #include <cstddef>
@@ -58,7 +52,7 @@ int main(int, char**) {
     {
         new_called = delete_called = 0;
         OverAligned* x = new (std::nothrow) OverAligned[3];
-        assert(static_cast<void*>(x) == DummyData);
+        ASSERT_WITH_OPERATOR_NEW_FALLBACKS(static_cast<void*>(x) == DummyData);
         ASSERT_WITH_OPERATOR_NEW_FALLBACKS(new_called == 1);
 
         delete[] x;

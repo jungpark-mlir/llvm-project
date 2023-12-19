@@ -332,6 +332,11 @@ public:
   static KnownBits computeForAddSub(bool Add, bool NSW, const KnownBits &LHS,
                                     KnownBits RHS);
 
+  /// Compute known bits results from subtracting RHS from LHS with 1-bit
+  /// Borrow.
+  static KnownBits computeForSubBorrow(const KnownBits &LHS, KnownBits RHS,
+                                       const KnownBits &Borrow);
+
   /// Compute knownbits resulting from llvm.sadd.sat(LHS, RHS)
   static KnownBits sadd_sat(const KnownBits &LHS, const KnownBits &RHS);
 
@@ -382,15 +387,19 @@ public:
 
   /// Compute known bits for shl(LHS, RHS).
   /// NOTE: RHS (shift amount) bitwidth doesn't need to be the same as LHS.
-  static KnownBits shl(const KnownBits &LHS, const KnownBits &RHS);
+  static KnownBits shl(const KnownBits &LHS, const KnownBits &RHS,
+                       bool NUW = false, bool NSW = false,
+                       bool ShAmtNonZero = false);
 
   /// Compute known bits for lshr(LHS, RHS).
   /// NOTE: RHS (shift amount) bitwidth doesn't need to be the same as LHS.
-  static KnownBits lshr(const KnownBits &LHS, const KnownBits &RHS);
+  static KnownBits lshr(const KnownBits &LHS, const KnownBits &RHS,
+                        bool ShAmtNonZero = false);
 
   /// Compute known bits for ashr(LHS, RHS).
   /// NOTE: RHS (shift amount) bitwidth doesn't need to be the same as LHS.
-  static KnownBits ashr(const KnownBits &LHS, const KnownBits &RHS);
+  static KnownBits ashr(const KnownBits &LHS, const KnownBits &RHS,
+                        bool ShAmtNonZero = false);
 
   /// Determine if these known bits always give the same ICMP_EQ result.
   static std::optional<bool> eq(const KnownBits &LHS, const KnownBits &RHS);

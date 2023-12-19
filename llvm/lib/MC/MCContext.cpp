@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/MC/MCContext.h"
-#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -85,7 +84,7 @@ MCContext::MCContext(const Triple &TheTriple, const MCAsmInfo *mai,
     Env = IsMachO;
     break;
   case Triple::COFF:
-    if (!TheTriple.isOSWindows())
+    if (!TheTriple.isOSWindows() && !TheTriple.isUEFI())
       report_fatal_error(
           "Cannot initialize MC for non-Windows COFF object files.");
 
@@ -272,7 +271,7 @@ MCSymbol *MCContext::createSymbol(StringRef Name, bool AlwaysAddSuffix,
   // label, if used.
   bool IsTemporary = CanBeUnnamed;
   if (AllowTemporaryLabels && !IsTemporary)
-    IsTemporary = Name.startswith(MAI->getPrivateGlobalPrefix());
+    IsTemporary = Name.starts_with(MAI->getPrivateGlobalPrefix());
 
   SmallString<128> NewName = Name;
   bool AddSuffix = AlwaysAddSuffix;
@@ -310,8 +309,12 @@ MCSymbol *MCContext::createNamedTempSymbol(const Twine &Name) {
 }
 
 MCSymbol *MCContext::createLinkerPrivateTempSymbol() {
+  return createLinkerPrivateSymbol("tmp");
+}
+
+MCSymbol *MCContext::createLinkerPrivateSymbol(const Twine &Name) {
   SmallString<128> NameSV;
-  raw_svector_ostream(NameSV) << MAI->getLinkerPrivateGlobalPrefix() << "tmp";
+  raw_svector_ostream(NameSV) << MAI->getLinkerPrivateGlobalPrefix() << Name;
   return createSymbol(NameSV, true, false);
 }
 
@@ -379,8 +382,8 @@ MCContext::createXCOFFSymbolImpl(const StringMapEntry<bool> *Name,
     return new (nullptr, *this) MCSymbolXCOFF(nullptr, IsTemporary);
 
   StringRef OriginalName = Name->first();
-  if (OriginalName.startswith("._Renamed..") ||
-      OriginalName.startswith("_Renamed.."))
+  if (OriginalName.starts_with("._Renamed..") ||
+      OriginalName.starts_with("_Renamed.."))
     reportError(SMLoc(), "invalid symbol name from source");
 
   if (MAI->isValidUnquotedName(OriginalName))
@@ -588,7 +591,7 @@ MCSectionELF *MCContext::getELFSection(const Twine &Section, unsigned Type,
                .StartsWith(".gnu.linkonce.td.", SectionKind::getThreadData())
                .StartsWith(".llvm.linkonce.td.", SectionKind::getThreadData())
                .StartsWith(".debug_", SectionKind::getMetadata())
-               .Default(SectionKind::getText());
+               .Default(SectionKind::getReadOnly());
 
   MCSectionELF *Result =
       createELFSectionImpl(CachedName, Type, Flags, Kind, EntrySize, GroupSym,
@@ -625,8 +628,8 @@ void MCContext::recordELFMergeableSectionInfo(StringRef SectionName,
 }
 
 bool MCContext::isELFImplicitMergeableSectionNamePrefix(StringRef SectionName) {
-  return SectionName.startswith(".rodata.str") ||
-         SectionName.startswith(".rodata.cst");
+  return SectionName.starts_with(".rodata.str") ||
+         SectionName.starts_with(".rodata.cst");
 }
 
 bool MCContext::isELFGenericMergeableSection(StringRef SectionName) {
@@ -920,6 +923,12 @@ EmitDwarfUnwindType MCContext::emitDwarfUnwindInfo() const {
   if (!TargetOptions)
     return EmitDwarfUnwindType::Default;
   return TargetOptions->EmitDwarfUnwind;
+}
+
+bool MCContext::emitCompactUnwindNonCanonical() const {
+  if (TargetOptions)
+    return TargetOptions->EmitCompactUnwindNonCanonical;
+  return false;
 }
 
 void MCContext::setGenDwarfRootFile(StringRef InputFileName, StringRef Buffer) {

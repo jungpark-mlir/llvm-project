@@ -152,6 +152,16 @@ MlirType mlirF16TypeGet(MlirContext ctx) {
   return wrap(FloatType::getF16(unwrap(ctx)));
 }
 
+MlirTypeID mlirFloatTF32TypeGetTypeID() {
+  return wrap(FloatTF32Type::getTypeID());
+}
+
+bool mlirTypeIsATF32(MlirType type) { return unwrap(type).isTF32(); }
+
+MlirType mlirTF32TypeGet(MlirContext ctx) {
+  return wrap(FloatType::getTF32(unwrap(ctx)));
+}
+
 MlirTypeID mlirFloat32TypeGetTypeID() { return wrap(Float32Type::getTypeID()); }
 
 bool mlirTypeIsAF32(MlirType type) { return unwrap(type).isF32(); }
@@ -271,6 +281,31 @@ MlirType mlirVectorTypeGetChecked(MlirLocation loc, intptr_t rank,
       unwrap(elementType)));
 }
 
+MlirType mlirVectorTypeGetScalable(intptr_t rank, const int64_t *shape,
+                                   const bool *scalable, MlirType elementType) {
+  return wrap(VectorType::get(
+      llvm::ArrayRef(shape, static_cast<size_t>(rank)), unwrap(elementType),
+      llvm::ArrayRef(scalable, static_cast<size_t>(rank))));
+}
+
+MlirType mlirVectorTypeGetScalableChecked(MlirLocation loc, intptr_t rank,
+                                          const int64_t *shape,
+                                          const bool *scalable,
+                                          MlirType elementType) {
+  return wrap(VectorType::getChecked(
+      unwrap(loc), llvm::ArrayRef(shape, static_cast<size_t>(rank)),
+      unwrap(elementType),
+      llvm::ArrayRef(scalable, static_cast<size_t>(rank))));
+}
+
+bool mlirVectorTypeIsScalable(MlirType type) {
+  return unwrap(type).cast<VectorType>().isScalable();
+}
+
+bool mlirVectorTypeIsDimScalable(MlirType type, intptr_t dim) {
+  return unwrap(type).cast<VectorType>().getScalableDims()[dim];
+}
+
 //===----------------------------------------------------------------------===//
 // Ranked / Unranked tensor type.
 //===----------------------------------------------------------------------===//
@@ -322,6 +357,10 @@ MlirType mlirUnrankedTensorTypeGet(MlirType elementType) {
 MlirType mlirUnrankedTensorTypeGetChecked(MlirLocation loc,
                                           MlirType elementType) {
   return wrap(UnrankedTensorType::getChecked(unwrap(loc), unwrap(elementType)));
+}
+
+MlirType mlirUnrankedTensorTypeGetElementType(MlirType type) {
+  return wrap(llvm::cast<UnrankedTensorType>(unwrap(type)).getElementType());
 }
 
 //===----------------------------------------------------------------------===//

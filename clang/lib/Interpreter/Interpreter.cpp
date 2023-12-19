@@ -11,17 +11,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/Interpreter/Interpreter.h"
-
+#include "DeviceOffload.h"
 #include "IncrementalExecutor.h"
 #include "IncrementalParser.h"
-
 #include "InterpreterUtils.h"
+
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/DiagnosticSema.h"
 #include "clang/Basic/TargetInfo.h"
+#include "clang/CodeGen/CodeGenAction.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Driver/Compilation.h"
@@ -31,6 +31,7 @@
 #include "clang/Driver/Tool.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
+#include "clang/Interpreter/Interpreter.h"
 #include "clang/Interpreter/Value.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Sema/Lookup.h"
@@ -125,7 +126,6 @@ CreateCI(const llvm::opt::ArgStringList &Argv) {
 
   Clang->getFrontendOpts().DisableFree = false;
   Clang->getCodeGenOpts().DisableFree = false;
-
   return std::move(Clang);
 }
 
@@ -146,7 +146,6 @@ IncrementalCompilerBuilder::create(std::vector<const char *> &ClangArgv) {
   // action and use other actions in incremental mode.
   // FIXME: Print proper driver diagnostics if the driver flags are wrong.
   // We do C++ by default; append right after argv[0] if no "-x" given
-  ClangArgv.insert(ClangArgv.end(), "-xc++");
   ClangArgv.insert(ClangArgv.end(), "-Xclang");
   ClangArgv.insert(ClangArgv.end(), "-fincremental-extensions");
   ClangArgv.insert(ClangArgv.end(), "-c");
@@ -177,6 +176,54 @@ IncrementalCompilerBuilder::create(std::vector<const char *> &ClangArgv) {
     return std::move(Err);
 
   return CreateCI(**ErrOrCC1Args);
+}
+
+llvm::Expected<std::unique_ptr<CompilerInstance>>
+IncrementalCompilerBuilder::CreateCpp() {
+  std::vector<const char *> Argv;
+  Argv.reserve(5 + 1 + UserArgs.size());
+  Argv.push_back("-xc++");
+  Argv.insert(Argv.end(), UserArgs.begin(), UserArgs.end());
+
+  return IncrementalCompilerBuilder::create(Argv);
+}
+
+llvm::Expected<std::unique_ptr<CompilerInstance>>
+IncrementalCompilerBuilder::createCuda(bool device) {
+  std::vector<const char *> Argv;
+  Argv.reserve(5 + 4 + UserArgs.size());
+
+  Argv.push_back("-xcuda");
+  if (device)
+    Argv.push_back("--cuda-device-only");
+  else
+    Argv.push_back("--cuda-host-only");
+
+  std::string SDKPathArg = "--cuda-path=";
+  if (!CudaSDKPath.empty()) {
+    SDKPathArg += CudaSDKPath;
+    Argv.push_back(SDKPathArg.c_str());
+  }
+
+  std::string ArchArg = "--offload-arch=";
+  if (!OffloadArch.empty()) {
+    ArchArg += OffloadArch;
+    Argv.push_back(ArchArg.c_str());
+  }
+
+  Argv.insert(Argv.end(), UserArgs.begin(), UserArgs.end());
+
+  return IncrementalCompilerBuilder::create(Argv);
+}
+
+llvm::Expected<std::unique_ptr<CompilerInstance>>
+IncrementalCompilerBuilder::CreateCudaDevice() {
+  return IncrementalCompilerBuilder::createCuda(true);
+}
+
+llvm::Expected<std::unique_ptr<CompilerInstance>>
+IncrementalCompilerBuilder::CreateCudaHost() {
+  return IncrementalCompilerBuilder::createCuda(false);
 }
 
 Interpreter::Interpreter(std::unique_ptr<CompilerInstance> CI,
@@ -227,6 +274,7 @@ Interpreter::create(std::unique_ptr<CompilerInstance> CI) {
       std::unique_ptr<Interpreter>(new Interpreter(std::move(CI), Err));
   if (Err)
     return std::move(Err);
+
   auto PTU = Interp->Parse(Runtimes);
   if (!PTU)
     return PTU.takeError();
@@ -237,6 +285,34 @@ Interpreter::create(std::unique_ptr<CompilerInstance> CI) {
   // beginning of the REPL so we have to mark them as 'Irrevocable'.
   Interp->InitPTUSize = Interp->IncrParser->getPTUs().size();
   return std::move(Interp);
+}
+
+llvm::Expected<std::unique_ptr<Interpreter>>
+Interpreter::createWithCUDA(std::unique_ptr<CompilerInstance> CI,
+                            std::unique_ptr<CompilerInstance> DCI) {
+  // avoid writing fat binary to disk using an in-memory virtual file system
+  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> IMVFS =
+      std::make_unique<llvm::vfs::InMemoryFileSystem>();
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
+      std::make_unique<llvm::vfs::OverlayFileSystem>(
+          llvm::vfs::getRealFileSystem());
+  OverlayVFS->pushOverlay(IMVFS);
+  CI->createFileManager(OverlayVFS);
+
+  auto Interp = Interpreter::create(std::move(CI));
+  if (auto E = Interp.takeError())
+    return std::move(E);
+
+  llvm::Error Err = llvm::Error::success();
+  auto DeviceParser = std::make_unique<IncrementalCUDADeviceParser>(
+      **Interp, std::move(DCI), *(*Interp)->IncrParser.get(),
+      *(*Interp)->TSCtx->getContext(), IMVFS, Err);
+  if (Err)
+    return std::move(Err);
+
+  (*Interp)->DeviceParser = std::move(DeviceParser);
+
+  return Interp;
 }
 
 const CompilerInstance *Interpreter::getCompilerInstance() const {
@@ -268,6 +344,14 @@ size_t Interpreter::getEffectivePTUSize() const {
 
 llvm::Expected<PartialTranslationUnit &>
 Interpreter::Parse(llvm::StringRef Code) {
+  // If we have a device parser, parse it first.
+  // The generated code will be included in the host compilation
+  if (DeviceParser) {
+    auto DevicePTU = DeviceParser->Parse(Code);
+    if (auto E = DevicePTU.takeError())
+      return std::move(E);
+  }
+
   // Tell the interpreter sliently ignore unused expressions since value
   // printing could cause it.
   getCompilerInstance()->getDiagnostics().setSeverity(
@@ -683,7 +767,7 @@ static void SetValueDataBasedOnQualType(Value &V, unsigned long long Data) {
   if (const auto *ET = QT->getAs<EnumType>())
     QT = ET->getDecl()->getIntegerType();
 
-  switch (QT->getAs<BuiltinType>()->getKind()) {
+  switch (QT->castAs<BuiltinType>()->getKind()) {
   default:
     llvm_unreachable("unknown type kind!");
 #define X(type, name)                                                          \

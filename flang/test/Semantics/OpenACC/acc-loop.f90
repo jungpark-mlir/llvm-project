@@ -257,4 +257,30 @@ program openacc_loop_validity
       a(i) = 3.14
     end do
   end do
+
+  !ERROR: The num argument is not allowed when dim is specified
+  !$acc loop gang(1, dim: 2)
+  do i = 1, N
+  end do
+
+  !$acc loop
+  do i = 1, N
+  end do
+  !$acc end loop
+
+  !$acc loop collapse(2)
+  do i = 1, 10
+    !ERROR: LOOP directive not expected in COLLAPSE loop nest
+    !$acc loop
+    do j = 1, 10
+    end do
+  end do
+
+  !$acc parallel
+  !$acc loop
+  do i = 1, n
+    if(i == 10) cycle
+  end do
+  !$acc end parallel
+
 end program openacc_loop_validity

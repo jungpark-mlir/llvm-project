@@ -42,6 +42,13 @@ namespace fir {
 
 #define DEBUG_TYPE "stack-arrays"
 
+static llvm::cl::opt<std::size_t> maxAllocsPerFunc(
+    "stack-arrays-max-allocs",
+    llvm::cl::desc("The maximum number of heap allocations to consider in one "
+                   "function before skipping (to save compilation time). Set "
+                   "to 0 for no limit."),
+    llvm::cl::init(1000), llvm::cl::Hidden);
+
 namespace {
 
 /// The state of an SSA value at each program point
@@ -139,9 +146,9 @@ public:
 };
 
 class AllocationAnalysis
-    : public mlir::dataflow::DenseDataFlowAnalysis<LatticePoint> {
+    : public mlir::dataflow::DenseForwardDataFlowAnalysis<LatticePoint> {
 public:
-  using DenseDataFlowAnalysis::DenseDataFlowAnalysis;
+  using DenseForwardDataFlowAnalysis::DenseForwardDataFlowAnalysis;
 
   void visitOperation(mlir::Operation *op, const LatticePoint &before,
                       LatticePoint *after) override;
@@ -411,6 +418,17 @@ void AllocationAnalysis::processOperation(mlir::Operation *op) {
 mlir::LogicalResult
 StackArraysAnalysisWrapper::analyseFunction(mlir::Operation *func) {
   assert(mlir::isa<mlir::func::FuncOp>(func));
+  size_t nAllocs = 0;
+  func->walk([&nAllocs](fir::AllocMemOp) { nAllocs++; });
+  // don't bother with the analysis if there are no heap allocations
+  if (nAllocs == 0)
+    return mlir::success();
+  if ((maxAllocsPerFunc != 0) && (nAllocs > maxAllocsPerFunc)) {
+    LLVM_DEBUG(llvm::dbgs() << "Skipping stack arrays for function with "
+                            << nAllocs << " heap allocations");
+    return mlir::success();
+  }
+
   mlir::DataFlowSolver solver;
   // constant propagation is required for dead code analysis, dead code analysis
   // is required to mark blocks live (required for mlir dense dfa)
@@ -465,6 +483,30 @@ StackArraysAnalysisWrapper::getCandidateOps(mlir::Operation *func) {
   return &funcMaps[func];
 }
 
+/// Restore the old allocation type exected by existing code
+static mlir::Value convertAllocationType(mlir::PatternRewriter &rewriter,
+                                         const mlir::Location &loc,
+                                         mlir::Value heap, mlir::Value stack) {
+  mlir::Type heapTy = heap.getType();
+  mlir::Type stackTy = stack.getType();
+
+  if (heapTy == stackTy)
+    return stack;
+
+  fir::HeapType firHeapTy = mlir::cast<fir::HeapType>(heapTy);
+  LLVM_ATTRIBUTE_UNUSED fir::ReferenceType firRefTy =
+      mlir::cast<fir::ReferenceType>(stackTy);
+  assert(firHeapTy.getElementType() == firRefTy.getElementType() &&
+         "Allocations must have the same type");
+
+  auto insertionPoint = rewriter.saveInsertionPoint();
+  rewriter.setInsertionPointAfter(stack.getDefiningOp());
+  mlir::Value conv =
+      rewriter.create<fir::ConvertOp>(loc, firHeapTy, stack).getResult();
+  rewriter.restoreInsertionPoint(insertionPoint);
+  return conv;
+}
+
 mlir::LogicalResult
 AllocMemConversion::matchAndRewrite(fir::AllocMemOp allocmem,
                                     mlir::PatternRewriter &rewriter) const {
@@ -476,12 +518,18 @@ AllocMemConversion::matchAndRewrite(fir::AllocMemOp allocmem,
     return mlir::failure();
 
   // remove freemem operations
+  llvm::SmallVector<mlir::Operation *> erases;
   for (mlir::Operation *user : allocmem.getOperation()->getUsers())
     if (mlir::isa<fir::FreeMemOp>(user))
-      rewriter.eraseOp(user);
+      erases.push_back(user);
+  // now we are done iterating the users, it is safe to mutate them
+  for (mlir::Operation *erase : erases)
+    rewriter.eraseOp(erase);
 
   // replace references to heap allocation with references to stack allocation
-  rewriter.replaceAllUsesWith(allocmem.getResult(), alloca->getResult());
+  mlir::Value newValue = convertAllocationType(
+      rewriter, allocmem.getLoc(), allocmem.getResult(), alloca->getResult());
+  rewriter.replaceAllUsesWith(allocmem.getResult(), newValue);
 
   // remove allocmem operation
   rewriter.eraseOp(allocmem.getOperation());
@@ -651,8 +699,7 @@ void AllocMemConversion::insertStackSaveRestore(
     fir::AllocMemOp &oldAlloc, mlir::PatternRewriter &rewriter) const {
   auto oldPoint = rewriter.saveInsertionPoint();
   auto mod = oldAlloc->getParentOfType<mlir::ModuleOp>();
-  fir::KindMapping kindMap = fir::getKindMapping(mod);
-  fir::FirOpBuilder builder{rewriter, kindMap};
+  fir::FirOpBuilder builder{rewriter, mod};
 
   mlir::func::FuncOp stackSaveFn = fir::factory::getLlvmStackSave(builder);
   mlir::SymbolRefAttr stackSaveSym =

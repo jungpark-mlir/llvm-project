@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13.4)
+cmake_minimum_required(VERSION 3.20.0)
 
 if(NOT DEFINED LLVM_COMMON_CMAKE_UTILS)
   set(LLVM_COMMON_CMAKE_UTILS ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
@@ -11,13 +11,6 @@ include(${LLVM_COMMON_CMAKE_UTILS}/Modules/CMakePolicy.cmake
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   project(Clang)
   set(CLANG_BUILT_STANDALONE TRUE)
-  if ("${CMAKE_VERSION}" VERSION_LESS "3.20.0")
-    message(WARNING
-      "Your CMake version is ${CMAKE_VERSION}. Starting with LLVM 17.0.0, the "
-      "minimum version of CMake required to build LLVM will become 3.20.0, and "
-      "using an older CMake will become an error. Please upgrade your CMake to "
-      "at least 3.20.0 now to avoid issues in the future!")
-  endif()
 endif()
 
 # Must go below project(..)
@@ -89,10 +82,10 @@ if(CLANG_BUILT_STANDALONE)
   set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX} )
   set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX} )
 
-  if(LLVM_INCLUDE_TESTS)
-    find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED
-      COMPONENTS Interpreter)
+  find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED
+    COMPONENTS Interpreter)
 
+  if(LLVM_INCLUDE_TESTS)
     # Check prebuilt llvm/utils.
     if(EXISTS ${LLVM_TOOLS_BINARY_DIR}/FileCheck${CMAKE_EXECUTABLE_SUFFIX}
         AND EXISTS ${LLVM_TOOLS_BINARY_DIR}/count${CMAKE_EXECUTABLE_SUFFIX}
@@ -297,8 +290,10 @@ endif()
 if(NOT DEFINED CLANG_VERSION_PATCHLEVEL)
   set(CLANG_VERSION_PATCHLEVEL ${LLVM_VERSION_PATCH})
 endif()
-# Unlike PACKAGE_VERSION, CLANG_VERSION does not include LLVM_VERSION_SUFFIX.
-set(CLANG_VERSION "${CLANG_VERSION_MAJOR}.${CLANG_VERSION_MINOR}.${CLANG_VERSION_PATCHLEVEL}")
+if(NOT DEFINED CLANG_VERSION_SUFFIX)
+  set(CLANG_VERSION_SUFFIX ${LLVM_VERSION_SUFFIX})
+endif()
+set(CLANG_VERSION "${CLANG_VERSION_MAJOR}.${CLANG_VERSION_MINOR}.${CLANG_VERSION_PATCHLEVEL}${CLANG_VERSION_SUFFIX}")
 message(STATUS "Clang version: ${CLANG_VERSION}")
 
 # Configure the Version.inc file.
@@ -462,6 +457,7 @@ get_property(CLANG_TABLEGEN_TARGETS GLOBAL PROPERTY CLANG_TABLEGEN_TARGETS)
 add_custom_target(clang-tablegen-targets
   DEPENDS
   omp_gen
+  ClangDriverOptions
   ${CLANG_TABLEGEN_TARGETS})
 set_target_properties(clang-tablegen-targets PROPERTIES FOLDER "Misc")
 list(APPEND LLVM_COMMON_DEPENDS clang-tablegen-targets)
@@ -656,6 +652,7 @@ if (CLANG_ENABLE_BOOTSTRAP)
     CLANG_VERSION_MAJOR
     CLANG_VERSION_MINOR
     CLANG_VERSION_PATCHLEVEL
+    CLANG_VERSION_SUFFIX
     CLANG_VENDOR
     LLVM_VERSION_SUFFIX
     LLVM_BINUTILS_INCDIR

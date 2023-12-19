@@ -6,8 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/DWARFLinkerParallel/DWARFLinker.h"
+#include "DWARFLinkerImpl.h"
+#include "DependencyTracker.h"
 
-namespace llvm {
-namespace dwarflinker_parallel {} // end of namespace dwarflinker_parallel
-} // namespace llvm
+std::unique_ptr<llvm::dwarflinker_parallel::DWARFLinker>
+llvm::dwarflinker_parallel::DWARFLinker::createLinker(
+    MessageHandlerTy ErrorHandler, MessageHandlerTy WarningHandler,
+    TranslatorFuncTy StringsTranslator) {
+  return std::make_unique<DWARFLinkerImpl>(ErrorHandler, WarningHandler,
+                                           StringsTranslator);
+}

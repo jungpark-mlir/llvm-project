@@ -93,6 +93,7 @@ public:
   }
   const std::string &moduleDirectory() const { return moduleDirectory_; }
   const std::string &moduleFileSuffix() const { return moduleFileSuffix_; }
+  bool underscoring() const { return underscoring_; }
   bool warningsAreErrors() const { return warningsAreErrors_; }
   bool debugModuleWriter() const { return debugModuleWriter_; }
   const evaluate::IntrinsicProcTable &intrinsics() const { return intrinsics_; }
@@ -130,6 +131,10 @@ public:
     moduleFileSuffix_ = x;
     return *this;
   }
+  SemanticsContext &set_underscoring(bool x) {
+    underscoring_ = x;
+    return *this;
+  }
   SemanticsContext &set_warnOnNonstandardUsage(bool x) {
     warnOnNonstandardUsage_ = x;
     return *this;
@@ -141,14 +146,6 @@ public:
 
   SemanticsContext &set_debugModuleWriter(bool x) {
     debugModuleWriter_ = x;
-    return *this;
-  }
-
-  bool anyDefinedIntrinsicOperator() const {
-    return anyDefinedIntrinsicOperator_;
-  }
-  SemanticsContext &set_anyDefinedIntrinsicOperator(bool yes = true) {
-    anyDefinedIntrinsicOperator_ = yes;
     return *this;
   }
 
@@ -185,6 +182,7 @@ public:
 
   const Scope &FindScope(parser::CharBlock) const;
   Scope &FindScope(parser::CharBlock);
+  void UpdateScopeIndex(Scope &, parser::CharBlock);
 
   bool IsInModuleFile(parser::CharBlock) const;
 
@@ -215,7 +213,10 @@ public:
   void UseFortranBuiltinsModule();
   const Scope *GetBuiltinsScope() const { return builtinsScope_; }
 
-  void UsePPCFortranBuiltinsModule();
+  void UsePPCBuiltinTypesModule();
+  const Scope &GetCUDABuiltinsScope();
+  void UsePPCBuiltinsModule();
+  Scope *GetPPCBuiltinTypesScope() { return ppcBuiltinTypesScope_; }
   const Scope *GetPPCBuiltinsScope() const { return ppcBuiltinsScope_; }
 
   // Saves a module file's parse tree so that it remains available
@@ -247,18 +248,26 @@ public:
   CommonBlockList GetCommonBlocks() const;
 
 private:
+  struct ScopeIndexComparator {
+    bool operator()(parser::CharBlock, parser::CharBlock) const;
+  };
+  using ScopeIndex =
+      std::multimap<parser::CharBlock, Scope &, ScopeIndexComparator>;
+  ScopeIndex::iterator SearchScopeIndex(parser::CharBlock);
+
   void CheckIndexVarRedefine(
       const parser::CharBlock &, const Symbol &, parser::MessageFixedText &&);
   void CheckError(const Symbol &);
 
   const common::IntrinsicTypeDefaultKinds &defaultKinds_;
-  const common::LanguageFeatureControl languageFeatures_;
+  const common::LanguageFeatureControl &languageFeatures_;
   parser::AllCookedSources &allCookedSources_;
   std::optional<parser::CharBlock> location_;
   std::vector<std::string> searchDirectories_;
   std::vector<std::string> intrinsicModuleDirectories_;
   std::string moduleDirectory_{"."s};
   std::string moduleFileSuffix_{".mod"};
+  bool underscoring_{true};
   bool warnOnNonstandardUsage_{false};
   bool warningsAreErrors_{false};
   bool debugModuleWriter_{false};
@@ -266,6 +275,7 @@ private:
   evaluate::TargetCharacteristics targetCharacteristics_;
   Scope globalScope_;
   Scope &intrinsicModulesScope_;
+  ScopeIndex scopeIndex_;
   parser::Messages messages_;
   evaluate::FoldingContext foldingContext_;
   ConstructStack constructStack_;
@@ -278,10 +288,11 @@ private:
   UnorderedSymbolSet errorSymbols_;
   std::set<std::string> tempNames_;
   const Scope *builtinsScope_{nullptr}; // module __Fortran_builtins
-  const Scope *ppcBuiltinsScope_{nullptr}; // module __Fortran_PPC_intrinsics
+  Scope *ppcBuiltinTypesScope_{nullptr}; // module __Fortran_PPC_types
+  std::optional<const Scope *> cudaBuiltinsScope_; // module __CUDA_builtins
+  const Scope *ppcBuiltinsScope_{nullptr}; // module __ppc_intrinsics
   std::list<parser::Program> modFileParseTrees_;
   std::unique_ptr<CommonBlockMap> commonBlockMap_;
-  bool anyDefinedIntrinsicOperator_{false};
 };
 
 class Semantics {

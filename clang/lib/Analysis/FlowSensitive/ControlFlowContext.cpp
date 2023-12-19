@@ -68,11 +68,28 @@ static llvm::BitVector findReachableBlocks(const CFG &Cfg) {
 }
 
 llvm::Expected<ControlFlowContext>
+ControlFlowContext::build(const FunctionDecl &Func) {
+  if (!Func.hasBody())
+    return llvm::createStringError(
+        std::make_error_code(std::errc::invalid_argument),
+        "Cannot analyze function without a body");
+
+  return build(Func, *Func.getBody(), Func.getASTContext());
+}
+
+llvm::Expected<ControlFlowContext>
 ControlFlowContext::build(const Decl &D, Stmt &S, ASTContext &C) {
   if (D.isTemplated())
     return llvm::createStringError(
         std::make_error_code(std::errc::invalid_argument),
         "Cannot analyze templated declarations");
+
+  // The shape of certain elements of the AST can vary depending on the
+  // language. We currently only support C++.
+  if (!C.getLangOpts().CPlusPlus)
+    return llvm::createStringError(
+        std::make_error_code(std::errc::invalid_argument),
+        "Can only analyze C++");
 
   CFG::BuildOptions Options;
   Options.PruneTriviallyFalseEdges = true;
@@ -80,6 +97,7 @@ ControlFlowContext::build(const Decl &D, Stmt &S, ASTContext &C) {
   Options.AddTemporaryDtors = true;
   Options.AddInitializers = true;
   Options.AddCXXDefaultInitExprInCtors = true;
+  Options.AddLifetime = true;
 
   // Ensure that all sub-expressions in basic blocks are evaluated.
   Options.setAllAlwaysAdd();
@@ -95,18 +113,8 @@ ControlFlowContext::build(const Decl &D, Stmt &S, ASTContext &C) {
 
   llvm::BitVector BlockReachable = findReachableBlocks(*Cfg);
 
-  return ControlFlowContext(&D, std::move(Cfg), std::move(StmtToBlock),
+  return ControlFlowContext(D, std::move(Cfg), std::move(StmtToBlock),
                             std::move(BlockReachable));
-}
-
-llvm::Expected<ControlFlowContext>
-ControlFlowContext::build(const Decl *D, Stmt &S, ASTContext &C) {
-  if (D == nullptr)
-    return llvm::createStringError(
-        std::make_error_code(std::errc::invalid_argument),
-        "Declaration must not be null");
-
-  return build(*D, S, C);
 }
 
 } // namespace dataflow
