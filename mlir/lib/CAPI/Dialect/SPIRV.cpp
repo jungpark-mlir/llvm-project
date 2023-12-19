@@ -6,9 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir-c/Dialect/SPIRV.h"
 #include "mlir/CAPI/Registration.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 
-MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(SPIRV, spirv,
-                                      mlir::spirv::SPIRVDialect)
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(SPIRV, spirv, mlir::spirv::SPIRVDialect)

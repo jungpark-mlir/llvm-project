@@ -14,7 +14,6 @@ add_subdirectory(Interfaces)
 add_subdirectory(IR)
 add_subdirectory(RegisterEverything)
 add_subdirectory(Transforms)
-add_subdirectory(Target)
 
 if(MLIR_ENABLE_EXECUTION_ENGINE)
   add_subdirectory(ExecutionEngine)
