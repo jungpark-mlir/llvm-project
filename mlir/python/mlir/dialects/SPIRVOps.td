@@ -1,4 +1,4 @@
-//===-- TensorOps.td - Entry point for TensorOps bind ------*- tablegen -*-===//
+//===-- SPIRVOps.td - Entry point for SPIRVOps bind ------*- tablegen -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -9,7 +9,6 @@
 #ifndef PYTHON_BINDINGS_SPIRV_OPS
 #define PYTHON_BINDINGS_SPIRV_OPS
 
-include "mlir/Bindings/Python/Attributes.td"
 include "mlir/Dialect/SPIRV/IR/SPIRVOps.td"
 
 #endif
