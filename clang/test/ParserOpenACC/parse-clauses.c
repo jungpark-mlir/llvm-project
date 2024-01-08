@@ -56,6 +56,186 @@ void func() {
 
 }
 
+void DefaultClause() {
+  // expected-error@+2{{expected '('}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial loop default
+  for(;;){}
+
+  // expected-error@+2{{expected '('}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default seq
+  for(;;){}
+
+  // expected-error@+2{{expected '('}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default, seq
+  for(;;){}
+
+  // expected-error@+4{{expected identifier}}
+  // expected-error@+3{{expected ')'}}
+  // expected-note@+2{{to match this '('}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default(
+  for(;;){}
+
+  // expected-error@+4{{invalid value for 'default' clause; expected 'present' or 'none'}}
+  // expected-error@+3{{expected ')'}}
+  // expected-note@+2{{to match this '('}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default( seq
+  for(;;){}
+
+  // expected-error@+4{{expected identifier}}
+  // expected-error@+3{{expected ')'}}
+  // expected-note@+2{{to match this '('}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default(, seq
+  for(;;){}
+
+  // expected-error@+3{{expected '('}}
+  // expected-error@+2{{expected identifier}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default)
+  for(;;){}
+
+  // expected-error@+3{{expected '('}}
+  // expected-error@+2{{expected identifier}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default) seq
+  for(;;){}
+
+  // expected-error@+3{{expected '('}}
+  // expected-error@+2{{expected identifier}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default), seq
+  for(;;){}
+
+  // expected-error@+2{{expected identifier}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default()
+  for(;;){}
+
+  // expected-error@+2{{expected identifier}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default() seq
+  for(;;){}
+
+  // expected-error@+2{{expected identifier}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default(), seq
+  for(;;){}
+
+  // expected-error@+2{{invalid value for 'default' clause; expected 'present' or 'none'}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default(invalid)
+  for(;;){}
+
+  // expected-error@+2{{invalid value for 'default' clause; expected 'present' or 'none'}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default(auto) seq
+  for(;;){}
+
+  // expected-error@+2{{invalid value for 'default' clause; expected 'present' or 'none'}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default(invalid), seq
+  for(;;){}
+
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default(none)
+  for(;;){}
+
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial default(present), seq
+  for(;;){}
+}
+
+void IfClause() {
+  // expected-error@+2{{expected '('}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial loop if
+  for(;;){}
+
+  // expected-error@+2{{expected '('}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if seq
+  for(;;){}
+
+  // expected-error@+2{{expected '('}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if, seq
+  for(;;){}
+
+  // expected-error@+2{{expected expression}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if(
+  for(;;){}
+
+  // expected-error@+2{{use of undeclared identifier 'seq'}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if( seq
+  for(;;){}
+
+  // expected-error@+3{{expected expression}}
+  // expected-error@+2{{use of undeclared identifier 'seq'}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if(, seq
+  for(;;){}
+
+  // expected-error@+3{{expected '('}}
+  // expected-error@+2{{expected identifier}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if)
+  for(;;){}
+
+  // expected-error@+3{{expected '('}}
+  // expected-error@+2{{expected identifier}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if) seq
+  for(;;){}
+
+  // expected-error@+3{{expected '('}}
+  // expected-error@+2{{expected identifier}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if), seq
+  for(;;){}
+
+  // expected-error@+2{{expected expression}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if()
+  for(;;){}
+
+  // expected-error@+2{{expected expression}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if() seq
+  for(;;){}
+
+  // expected-error@+2{{expected expression}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if(), seq
+  for(;;){}
+
+  // expected-error@+2{{use of undeclared identifier 'invalid_expr'}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if(invalid_expr)
+  for(;;){}
+
+  // expected-error@+2{{expected expression}}
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if() seq
+  for(;;){}
+
+  int i, j;
+
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if(i > j)
+  for(;;){}
+
+  // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
+#pragma acc serial if(1+5>3), seq
+  for(;;){}
+}
+
   // expected-warning@+1{{OpenACC directives not yet implemented, pragma ignored}}
 #pragma acc routine worker, vector, seq, nohost
 void bar();
