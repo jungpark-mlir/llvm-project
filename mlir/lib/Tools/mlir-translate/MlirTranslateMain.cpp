@@ -20,6 +20,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/InitAllDialects.h"
 
 using namespace mlir;
 
@@ -139,6 +140,7 @@ LogicalResult mlir::mlirTranslateMain(int argc, char **argv,
           timing.nest(translationRequested->getDescription());
 
       MLIRContext context;
+      registerAllDialects(context);
       context.allowUnregisteredDialects(allowUnregisteredDialects);
       context.printOpOnDiagnostic(!verifyDiagnostics);
       auto sourceMgr = std::make_shared<llvm::SourceMgr>();
