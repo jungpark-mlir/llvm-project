@@ -32,13 +32,6 @@ func.func @unsupported_float_type(%arg0 : f80) {
 
 // -----
 
-// expected-error@+1 {{cannot emit type 'memref<100xf32>'}}
-func.func @memref_type(%arg0 : memref<100xf32>) {
-  return
-}
-
-// -----
-
 // expected-error@+1 {{cannot emit type 'vector<100xf32>'}}
 func.func @vector_type(%arg0 : vector<100xf32>) {
   return
