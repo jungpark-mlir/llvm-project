@@ -365,6 +365,45 @@ llvm.func @rocdl.xdlops(%arg0 : f32, %arg1 : f32,
   llvm.return %r0 : vector<32 x f32>
 }
 
+llvm.func @rocdl.gfx950(%arg0 : f32,
+                   %arg1 : vector<8 x bf16>, %arg2 : vector<4xf32>,
+                   %arg3 : vector<8xi32>, %arg4 : vector<4xf32>,
+                   %arg5 : vector<4xi32>, %arg6 : vector<4xf16>,
+                   %arg7 : vector<16xf32>, %arg8 : vector<16xi32>,
+                   %arg9 : vector<8xf16>) -> vector<4 x f32> {
+  %cst0 = llvm.mlir.constant(0 : i32) : i32
+  %cst1 = llvm.mlir.constant(1 : i32) : i32
+  %cst2 = llvm.mlir.constant(2 : i32) : i32
+  %cst3 = llvm.mlir.constant(3 : i32) : i32
+  %csti32 = llvm.mlir.constant(42 : i32) : i32
+
+  // New in gfx950
+  //%r0 = rocdl.mfma.scale.f32.16x16x128.f8f6f4 %arg3, %arg3, %arg4, %cst3, %cst1, %cst2, %csti32, %cst3, %csti32 :
+  //                            (vector<8xi32>, vector<8xi32>, vector<4xf32>, i32, i32, i32, i32, i32, i32) -> vector<4xf32>
+  %r1 = rocdl.mfma.scale.f32.32x32x64.f8f6f4 %arg3, %arg3, %arg7, %cst0, %cst0, %cst0, %cst1, %cst0, %cst1 :
+                              (vector<8xi32>, vector<8xi32>, vector<16xf32>, i32, i32, i32, i32, i32, i32) -> vector<16xf32>
+
+  %r2 = rocdl.mfma.f32.16x16x32.bf16 %arg1, %arg1, %arg2, %csti32, %csti32, %csti32 :
+                              (vector<8xbf16>, vector<8xbf16>, vector<4xf32>, i32, i32, i32) -> vector<4xf32>
+
+  %r3 = rocdl.mfma.i32.16x16x64.i8 %arg5, %arg5, %arg5, %csti32, %csti32, %csti32 :
+                              (vector<4xi32>, vector<4xi32>, vector<4xi32>, i32, i32, i32) -> vector<4xi32>
+
+  %r4 = rocdl.mfma.f32.16x16x32.f16 %arg9, %arg9, %arg2, %csti32, %csti32, %csti32 :
+                               (vector<8xf16>, vector<8xf16>, vector<4xf32>, i32, i32, i32) -> vector<4xi32>
+
+  %r5 = rocdl.mfma.f32.32x32x16.bf16 %arg1, %arg1, %arg7, %csti32, %csti32, %csti32 :
+                               (vector<8xbf16>, vector<8xbf16>, vector<16xf32>, i32, i32, i32) -> vector<16xf32>
+
+  %r6 = rocdl.mfma.i32.32x32x32.i8 %arg5, %arg5, %arg8, %csti32, %csti32, %csti32 :
+                               (vector<4xi32>, vector<4xi32>, vector<16xi32>, i32, i32, i32) -> vector<16xi32>
+
+  %r7 = rocdl.mfma.f32.32x32x16.f16 %arg9, %arg9, %arg7, %csti32, %csti32, %csti32 :
+                               (vector<8xf16>, vector<8xf16>, vector<16xf32>, i32, i32, i32) -> vector<16xf32>
+
+   llvm.return %r2 : vector<4 x f32>
+}
+
 llvm.func @rocdl.wmma(%arg0 : vector<8xf32>, %arg1 : vector<16 x f16>, %arg2 : vector<16 x i16>, %arg3 : vector<8 x i32>,
                       %arg4 : vector<2xi32>, %arg5 : vector<4xi32>, %arg6 : vector<4xf32>, %arg7 : vector<8xf16>, %arg8 : vector<8xi16>) -> vector<8xf32> {
   %zero = llvm.mlir.constant(false) : i1
